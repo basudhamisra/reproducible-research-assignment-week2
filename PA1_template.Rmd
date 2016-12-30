@@ -1,0 +1,124 @@
+---
+title: "assignment-week-2"
+author: "Basudha"
+date: "December 29, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading and preprocessing the data.
+
+Here we are reading the data and converting the date column into date format.
+
+```{r readdata, echo = TRUE}
+activity <- read.table("activity.csv", header = TRUE, sep = ",")
+activity$date <- as.Date(activity$date, format = "%Y-%m-%d")
+```
+
+## Total number of steps taken per day.
+
+Here we are figuring out the total number of steps taken per day and plotting it as Histogram. The mean, median of total number of steps per day are also published separately, though summary function publishes much more than that including mean and median.
+
+```{r totalsteps, echo = TRUE}
+
+library(dplyr)
+library(ggplot2)
+
+tsperday <- summarise(group_by(activity,date),totalstep = sum(steps))
+
+ggplot(tsperday,aes(x = date,y = totalstep, color = "red")) +
+         geom_bar(stat = "identity", width = 1) + 
+         labs( y = "Total steps per day", 
+                x = "Date(year:2012)",
+                title = "Histogram of the total number of steps taken each day")
+
+mean(tsperday$totalstep, na.rm = TRUE)
+median(tsperday$totalstep, na.rm = TRUE)
+summary(tsperday)
+```
+
+## Average daily activity pattern.
+
+```{r dailyactivity, echo = TRUE}
+avstep <- with(activity,tapply(steps, interval, mean, na.rm = T))
+dfav <- data.frame(Interval = names(avstep), Averagestep = avstep)
+dfav$Interval <- as.numeric(as.character(dfav$Interval))
+
+ggplot(dfav, aes(Interval, Averagestep)) + geom_line(color = "green", size =1.5) + 
+  geom_point(color = "black", size =2, alpha =1/2) +
+  	labs( y = "Average steps over all days",
+  	      x = "Time interval",
+	 title = "Average daily activity pattern")
+
+highest <- dfav[with(dfav,order(-Averagestep, Interval)),]
+head(highest)
+```
+Therefore 835th interval, on average across all the days in the dataset, contains the maximum number of steps.
+
+## Total missing values.
+
+```{r missingvalue, echo = TRUE}
+
+sum(is.na(activity$steps))
+sum(is.na(activity$date))
+sum(is.na(activity$interval))
+```
+Therefore total number of missing values is 2304.
+
+
+## Imputing missing values.
+
+```{r imputing, echo = TRUE}
+
+fillITin <-  function(x){ 
+                 x$steps[is.na(x$steps)] <- ave(x$steps, x$interval,                                          FUN = function(z) 
+                 mean(z, na.rm = TRUE))[c(which(is.na(x$steps)))]
+return(x)
+}
+activity2 <- fillITin(activity)
+head(activity2)
+
+
+tsperday2 <- summarise(group_by(activity2,date),totalstep = sum(steps))
+
+ggplot(tsperday2,aes(x = date,y = totalstep, color = "red")) +
+         geom_bar(stat = "identity", width = 1) + 
+         labs( y = "Total steps per day", 
+                x = "Date(year:2012)",
+                title = "Histogram of the total number of steps taken each day after Imputation")
+
+mean(tsperday2$totalstep)
+median(tsperday2$totalstep)
+summary(tsperday2)
+```
+
+Mean remains same as before, whereas median changes slightly, earlier it was 10765, now it has become 10766.19.
+
+## Activity patterns between weekday and weekend.
+
+```{r weekday, echo = TRUE}
+weekday <- weekdays(activity2$date)
+activity3 <- cbind(activity2, weekday)
+activity3$weekday <- as.character(activity3$weekday)
+
+for(i in 1:dim(activity3)[1])
+  if(activity3$weekday[i] == "Saturday"|activity3$weekday[i] == "Sunday"){activity3$weekday[i] = "Weekend"}else{activity3$weekday[i] = "Weekday"}
+head(activity3)
+
+wday <- summarise(group_by(filter(activity3, weekday == "Weekday"), interval), Averagestep = mean(steps), weekday = "Weekday")
+wend <- summarise(group_by(filter(activity3, weekday == "Weekend"), interval), Averagestep = mean(steps), weekday = "Weekend")
+dfweek <- rbind(wday,wend)
+
+ggplot(dfweek, aes(interval, Averagestep)) + geom_line(color ="green", size =1.5) + 
+  geom_point(color = "black", size =2, alpha =1/5) +
+  facet_grid(.~ weekday) +
+  	labs( y = "Average steps over all days",
+  	      x = "Time interval",
+	 title = "Average daily activity pattern over weekdays and weekends")
+
+```
+
+
